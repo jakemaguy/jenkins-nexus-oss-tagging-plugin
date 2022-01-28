@@ -26,8 +26,27 @@ Install the plugin by copying the generated HPI file to:
 And restart Jenkins
 
 ## Jenkins Pipeline Example usage
+For more detailed understanding of the tagging request body, see sonatype documentation on tagging in Nexus:
 
-``
+https://help.sonatype.com/repomanager3/nexus-repository-administration/tagging
+
+```
+nexusArtifactTagger(
+    name: tagName, 
+    nexusUrl: nexusServerUrl
+    attributes: [
+        [key: 'Attribute-key', 
+        value: 'Attribute-Value']
+    ], 
+    components: [
+        [group: group, 
+        name: name, 
+        repo: repository, 
+        version: version]
+        ],
+    ]
+)
+```
 
 ## Contributing
 
