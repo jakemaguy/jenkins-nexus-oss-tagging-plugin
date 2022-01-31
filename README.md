@@ -33,7 +33,7 @@ https://help.sonatype.com/repomanager3/nexus-repository-administration/tagging
 ```
 nexusArtifactTagger(
     name: tagName, 
-    nexusUrl: nexusServerUrl
+    nexusUrl: nexusServerUrl,
     attributes: [
         [key: 'Attribute-key', 
         value: 'Attribute-Value']

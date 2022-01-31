@@ -1,4 +1,7 @@
 package io.jenkins.plugins.tagger;
+import java.io.IOException;
+import java.util.logging.Logger;
+
 import org.apache.commons.httpclient.HttpException;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -17,47 +20,60 @@ import jenkins.security.MasterToSlaveCallable;
 public class NexusArtifactTaggerRunner extends MasterToSlaveCallable<Boolean, Throwable> {
     private static final long serialVersionUID = 1L;
     private final TaskListener listener;
-    private transient final NexusArtifactTaggerStep step;
+    private final String tagName;
+    private final String requestBody;
+    private final String nexusUrl;
 
 
-    public NexusArtifactTaggerRunner(TaskListener listener, NexusArtifactTaggerStep step) {
+    public NexusArtifactTaggerRunner(TaskListener listener, String tagName, String requestBody, String nexusUrl) {
         this.listener = listener;
-        this.step = step;
+        this.tagName = tagName;
+        this.requestBody = requestBody;
+        this.nexusUrl = nexusUrl;
+    }
+
+
+    private int doesTagExist() throws IOException {
+        int exitCode;
+        CloseableHttpClient httpclient = HttpClients.createDefault();
+        try {
+            HttpGet doesTagExist = new HttpGet(nexusUrl + "/service/rest/v1/tags/" + tagName);
+            CloseableHttpResponse response = httpclient.execute(doesTagExist);
+            try {
+                exitCode = response.getStatusLine().getStatusCode();
+            } finally {
+                response.close();
+            }
+        } finally {
+            httpclient.close();
+        }
+        return exitCode;
     }
 
     @Override
     public Boolean call() throws Throwable {
-        // TaskListener listener = getContext().get(TaskListener.class);
-
-        int exitCode; // exit code from querying if the tag exists already
-        try(CloseableHttpClient httpclient = HttpClients.createDefault()) {
-            //perform get request to determine if tag already exsists
-            HttpGet doesTagExist = new HttpGet(step.getNexusUrl() + "/service/rest/v1/tags/" + step.getName());
-            CloseableHttpResponse response = httpclient.execute(doesTagExist);
-            exitCode = response.getStatusLine().getStatusCode();
-
-            listener.getLogger().println("Creating Tag: " + step.getName());
-            response.close();
-        }
-
+        listener.getLogger().println("Creating Tag: " + tagName);
+        int exitCode = doesTagExist();
+        
+        
+        int requestExitCode; // exit code for the PUT/POST request
         try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
             CloseableHttpResponse response;
             // if tag does not exist you'll get 404 status code
             if (exitCode != 200) {
                 // create the tag
-                HttpPost postRequest = new HttpPost(step.getNexusUrl() + "/service/rest/v1/tags");
-                HttpEntity stringEntity = new StringEntity(step.getRequestBody(),ContentType.APPLICATION_JSON);
+                HttpPost postRequest = new HttpPost(nexusUrl + "/service/rest/v1/tags");
+                HttpEntity stringEntity = new StringEntity(requestBody,ContentType.APPLICATION_JSON);
                 postRequest.setEntity(stringEntity);
                 response = httpclient.execute(postRequest);
             } else {
                 // tag already exists, update it with PUT
-                HttpPut putRequest = new HttpPut(step.getNexusUrl() + "/service/rest/v1/tags/" + step.getName());
-                HttpEntity stringEntity = new StringEntity(step.getRequestBody(),ContentType.APPLICATION_JSON);
+                HttpPut putRequest = new HttpPut(nexusUrl + "/service/rest/v1/tags/" + tagName);
+                HttpEntity stringEntity = new StringEntity(requestBody,ContentType.APPLICATION_JSON);
                 putRequest.setEntity(stringEntity);
                 response = httpclient.execute(putRequest);
             }
-            int requestExitCode = response.getStatusLine().getStatusCode();
-            response.close();
+            requestExitCode = response.getStatusLine().getStatusCode();
             if (requestExitCode != 200) {
                 listener.getLogger().println("\nTag Request Failed with Exit Code: " + requestExitCode);
                 listener.getLogger().println("FAILURE REASON: " + response.getStatusLine().getReasonPhrase());
@@ -65,8 +81,8 @@ public class NexusArtifactTaggerRunner extends MasterToSlaveCallable<Boolean, Th
                 String result = EntityUtils.toString(entity);
                 throw new HttpException("Unexpected response to CONNECT request\n" + result);
             }
-            listener.getLogger().println("Tag Created Sucesfully " + requestExitCode);
         }
+        this.listener.getLogger().println("Tag Created Successfully " + requestExitCode);
         return true;
     }
 }

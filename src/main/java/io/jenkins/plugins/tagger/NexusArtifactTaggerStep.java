@@ -124,9 +124,7 @@ public class NexusArtifactTaggerStep extends Step {
             VirtualChannel virtualChannel = filePath.getChannel();
             assert virtualChannel != null;
 
-            listener.getLogger().println("Here in the Run() method of the step");
-
-            virtualChannel.callAsync(new NexusArtifactTaggerRunner(listener, step)).get();
+            virtualChannel.callAsync(new NexusArtifactTaggerRunner(listener, step.getName(), step.getRequestBody(), step.getNexusUrl())).get();
             return null;
         }
     }
